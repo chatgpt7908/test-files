@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  mysql-prod:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    image: database:prod-v1
+    container_name: mysql-prod
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    networks:
+      - ierada-prod
+    env_file:
+      - ./database/.env
+    volumes:
+      - /Ierada_DB/production/ierada_database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  backend-prod:
+    build:
+      context: ./backend/Ierada_Dev_Ec2_Server
+      dockerfile: Dockerfile
+    image: backend:prod-v1
+    container_name: backend-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - ierada-prod
+    env_file:
+      - ./backend/Ierada_Dev_Ec2_Server/.env
+    volumes:
+      - /Ierada_DB/production/assets:/usr/src/app/assets
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
+
+  frontend-prod:
+    build:
+      context: ./frontend/Ierada_Dev_Ec2_Client
+      dockerfile: Dockerfile
+    image: frontend:prod-v1
+    container_name: frontend-prod
+    restart: unless-stopped
+    # REMOVED: ports with 443 (Reverse proxy handles HTTPS)
+    networks:
+      - ierada-prod
+    env_file:
+      - ./frontend/Ierada_Dev_Ec2_Client/.env
+    depends_on:
+      - backend-prod
+
+networks:
+  ierada-prod:
+    driver: bridge
+    name: ierada-prod
